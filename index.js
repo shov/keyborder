@@ -1,208 +1,157 @@
-// Output helpers
+class Input {
+  static _currentOrd = undefined
 
-const COLOR_PREFIX = {
+  static get ord() {
+    return Input._currentOrd
+  }
+
+  static _currentKey = undefined
+
+  static get key() {
+    return Input._currentKey
+  }
+
+  static set(data) {
+    Input._currentKey = String(data)
+    Input._currentOrd = Input._currentKey.charCodeAt(0)
+  }
+
+
+}
+
+class Printer {
+
+  static COLOR_PREFIX = {
     FG_RED: '\x1b[31m',
     FG_GREEN: '\x1b[32m',
     FG_YELLOW: '\x1b[33m',
+    FG_WHITE: '\u001b[37m',
+
+    BG_WHITE: '\u001b[47m',
+
     BLINK: '\x1b[5m',
     REVERSE: '\x1b[7m',
     RESET: '\x1b[0m',
-}
-const B = '█'
+  }
+  static SYMBOL = {F: '█', B: ' '}
 
-function write(text) {
+
+  static w(text) {
     process.stdout.write(text)
-}
+  }
 
-function backspace(num = 1) {
-    process.stdout.write(new Array(num).fill('\r').join(''))
-}
+  static r(len = 1) {
+    process.stdout.write(new Array(len).fill('\r').join(''))
+  }
 
-function newLine() {
+  static nl() {
     process.stdout.write('\n')
-}
+  }
 
-function delLine() {
-    process.stdout.write('\033[A')
-}
+  static dl() {
+    process.stdout.write('\x1B[A')
+  }
 
-function whiteLine(len) {
+  static fl(len, B) {
     process.stdout.write(new Array(len).fill(B).join(''))
-}
+  }
 
-function printOnWhiteLine(len, text) {
-    const prefix = COLOR_PREFIX.REVERSE
-    const postfix = COLOR_PREFIX.RESET
-    const line = new Array(len + 2).fill(B)
-
-    const textLength = text.length
-    line.splice(1, 1 + textLength + 1 + 2, prefix, ...text.split(''), postfix, B, B)
-    write(line.join(''))
-}
-
-function printInFrame(len, text) {
-    const line = new Array(len).fill(' ')
-    line[0] = B
-    line[line.length - 1] = B
-
-    const textLength = text.length
-    line.splice(Math.floor(len / 2) - Math.floor(textLength / 2), textLength, ...text.split(''))
-    write(line.join(''))
-}
-
-
-// Game logic
-
-let score = 0
-let theLine = ''
-let newLetterSpeed = 2000
-let readyToAddLetter = true
-let maxLineLength = 100
-let gameOver = false
-let theLinePrefix = COLOR_PREFIX.FG_GREEN
-const theLetterPrefix = COLOR_PREFIX.REVERSE
-
-
-function testKey(key) {
-    if (theLine[theLine.length - 1] === key) {
-        score += 10
-        theLine = theLine.slice(0, -1)
-    } else {
-        score -= 1
+  static fastFill(w, h, bg = Printer.COLOR_PREFIX.BG_WHITE, b = Printer.SYMBOL.B) {
+    for (let r = 0; r < h; r++) {
+      Printer.nl()
+      Printer.w(bg)
+      Printer.fl(w, b)
     }
+  }
+
+  static clear(w, h) {
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        Printer.r()
+      }
+      Printer.dl()
+    }
+  }
 }
 
+class UI {
 
-function addLetter() {
-    let randLetter = String.fromCharCode(Math.round(Math.random() * (122 - 97)) + 97)
-        ; ({
-            0: () => randLetter = ' ',
-            1: () => randLetter = randLetter,
-            2: () => randLetter = randLetter.toUpperCase(),
-            3: () => randLetter = randLetter,
-        })[Math.round(Math.random() * 3)]()
-    theLine += randLetter
 }
 
-
+// function printOnWhiteLine(len, text) {
+//   const prefix = COLOR_PREFIX.REVERSE
+//   const postfix = COLOR_PREFIX.RESET
+//   const line = new Array(len + 2).fill(B)
+//
+//   const textLength = text.length
+//   line.splice(1, 1 + textLength + 1 + 2, prefix, ...text.split(''), postfix, B, B)
+//   write(line.join(''))
+// }
+//
+// function printInFrame(len, text) {
+//   const line = new Array(len).fill(' ')
+//   line[0] = B
+//   line[line.length - 1] = B
+//
+//   const textLength = text.length
+//   line.splice(Math.floor(len / 2) - Math.floor(textLength / 2), textLength, ...text.split(''))
+//   write(line.join(''))
+// }
 
 class Engine {
-    _screenBack = []
-    _gameLoop
+  FPS = 25
 
-    start() {
-        process.stdin.setRawMode(true);
-        process.stdin.on('readable', function () {
-            let data
-            while ((data = this.read()) !== null) {
-                var key = String(data)
-                const ord = key.charCodeAt(0)
+  _gameLoop
+  _screen = {w: 0, h: 0,}
 
-                // Esc or ^C
-                if (ord === 27 || ord === 3) {
-                    process.exit(0)
-                }
-                testKey(key)
-            }
-        });
+  start() {
+    process.stdin.setRawMode(true)
+    process.stdin.on('readable', function () {
+      let data
+      while ((data = this.read()) !== null) {
+        Input.set(data)
+      }
+    })
 
+    const measureScreen = () => {
+      this._screen.w = process.stdout.columns
+      this._screen.h = process.stdout.rows
+    }
+    measureScreen()
 
+    // Initially fill screen with empty
+    Printer.fastFill(this._screen.w, this._screen.h)
 
-        let timeSnapshot = Date.now()
-        this._gameLoop = setInterval(() => {
-            const currTime = Date.now()
-            const dt = currTime - timeSnapshot
-            timeSnapshot = currTime
-            this.update(dt)
-            this.render(dt)
-        }, 1000 / 25)
+    let timeSnapshot = Date.now()
+    this._gameLoop = setInterval(() => {
+      const currTime = Date.now()
+      const dt = currTime - timeSnapshot
+      timeSnapshot = currTime
+
+      measureScreen()
+
+      this.update(dt)
+
+      Printer.clear(this._screen.w, this._screen.h)
+      this.render(dt)
+    }, 1000 / this.FPS)
+  }
+
+  update(dt) {
+    // Esc or ^C
+    if (Input.ord === 27 || Input.ord === 3) {
+      Printer.clear(this._screen.w, this._screen.h)
+      process.exit(0)
     }
 
-    update(dt) {
-        if (theLine.length > maxLineLength) {
-            gameOver = true
-            return
-        }
 
-        if (readyToAddLetter) {
-            readyToAddLetter = false
-            setTimeout(() => {
-                addLetter()
-                readyToAddLetter = true
-            }, newLetterSpeed)
-        }
+  }
 
-        switch (true) {
-            case score > 200: {
-                newLetterSpeed = 500
-                break
-            }
-            case score > 100: {
-                newLetterSpeed = 700
-                break
-            }
-            case score > 50: {
-                newLetterSpeed = 1000
-                break
-            }
-            default:
-                newLetterSpeed = 2000
-        }
+  render() {
+    const {w, h} = this._screen
+    Printer.fastFill(w, h)
 
-        switch (true) {
-            case theLine.length > 90: {
-                theLinePrefix = COLOR_PREFIX.FG_RED + COLOR_PREFIX.BLINK
-                break
-            }
-            case theLine.length > 70: {
-                theLinePrefix = COLOR_PREFIX.FG_RED
-                break
-            }
-            case theLine.length > 50: {
-                theLinePrefix = COLOR_PREFIX.FG_YELLOW
-                break
-            }
-            default:
-                theLinePrefix = COLOR_PREFIX.FG_GREEN
-        }
-    }
-
-    render() {
-        const screenWidth = process.stdout.columns
-        while (this._screenBack.length) {
-            const step = this._screenBack.pop()
-            step[0](...step[1])
-        }
-
-        if (gameOver) {
-            clearInterval(this._gameLoop)
-            printOnWhiteLine(screenWidth, 'Esc or ^C to exit.')
-            printInFrame(screenWidth, `GAME OVER ${score > 0 ? '🥲' : '☠️'}   SCORE: ${score}`)
-            whiteLine(screenWidth)
-            return
-        }
-
-        //Render scores
-        this._screenBack.push([backspace, [screenWidth]])
-        printOnWhiteLine(screenWidth, 'Type the last appeared letter to remove it! Esc or ^C to exit.')
-        this._screenBack.push([delLine, []])
-        newLine()
-
-        this._screenBack.push([backspace, [screenWidth]])
-        printInFrame(screenWidth, `SCORE: ${score}`)
-        this._screenBack.push([delLine, []])
-        newLine()
-
-        this._screenBack.push([backspace, [screenWidth]])
-        whiteLine(screenWidth)
-        this._screenBack.push([delLine, []])
-        newLine()
-
-
-        //Render line
-        this._screenBack.push([backspace, [theLine.length + 2]])
-        write(theLinePrefix + theLine.slice(0, -1) + theLetterPrefix + theLine.slice(-1) + COLOR_PREFIX.RESET)
-    }
+  }
 }
 
 (new Engine()).start()
